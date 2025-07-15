@@ -1,13 +1,14 @@
 // 文件路径： functions/api/tts.js
-// V3 - 自动获取并使用认证令牌的最终正确版本
+// V4 - 伪造浏览器身份，获取认证令牌的终极正确版本
 
 /**
  * Cloudflare Pages Function for Microsoft Text-to-Speech
  *
- * This function acts as a proxy to Microsoft's Cognitive Services TTS API.
- * It works by first fetching a temporary authentication token, then using that
- * token to call the TTS service, mimicking the behavior of the official demo page.
- * This avoids the need for a permanent Azure subscription key.
+ * This function works by first fetching a temporary authentication token, then using that
+ * token to call the TTS service.
+ *
+ * It mimics the official Azure demo page by setting the 'Origin' and 'Referer' headers
+ * to bypass the server's security checks, which was the cause of the "400 Bad Request" error.
  */
 export async function onRequest(context) {
   // 1. 从 URL 中获取查询参数
@@ -23,18 +24,22 @@ export async function onRequest(context) {
   }
 
   try {
-    // 2. 【核心修正！】第一步：获取临时认证令牌 (Access Token)
-    // 我们请求一个微软公开的、用于生成前端演示令牌的端点
+    // 2. 【终极修正！】第一步：伪装成浏览器，获取临时认证令牌
     const tokenResponse = await fetch('https://azure.microsoft.com/v8/api/js/token', {
         method: 'POST',
-        headers: { 'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher-V3-Final' }
+        headers: {
+            // 【关键！】伪造来源，告诉服务器我们是从官方演示页面来的
+            'Origin': 'https://azure.microsoft.com',
+            'Referer': 'https://azure.microsoft.com/en-us/products/cognitive-services/text-to-speech/',
+            'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher-V4-Ultimate'
+        }
     });
     if (!tokenResponse.ok) {
-      throw new Error(`获取令牌失败: ${tokenResponse.status} ${tokenResponse.statusText}`);
+      const errorText = await tokenResponse.text();
+      throw new Error(`获取令牌失败: ${tokenResponse.status} ${tokenResponse.statusText}\n服务器响应: ${errorText}`);
     }
     const { token, region } = await tokenResponse.json();
     
-    // 使用从令牌服务获取的区域来构建TTS端点URL，更加健壮
     const ttsUrl = `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`;
 
     // 3. 构建 SSML
@@ -46,14 +51,14 @@ export async function onRequest(context) {
       </speak>
     `;
 
-    // 4. 【核心修正！】第二步：携带令牌请求微软的 TTS API
+    // 4. 第二步：携带令牌请求微软的 TTS API
     const audioResponse = await fetch(ttsUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`, // <-- 使用获取到的令牌！
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/ssml+xml',
         'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
-        'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher-V3-Final',
+        'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher-V4-Ultimate',
       },
       body: ssml,
     });
@@ -67,7 +72,7 @@ export async function onRequest(context) {
     return new Response(audioResponse.body, {
       headers: {
         'Content-Type': 'audio/mpeg',
-        'Cache-Control': 'public, max-age=3600', // 缓存1小时
+        'Cache-Control': 'public, max-age=3600',
       },
     });
 
