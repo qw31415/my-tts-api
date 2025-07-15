@@ -1,20 +1,21 @@
 // 文件路径： functions/api/tts.js
-// V10 - The Ultimate Solution: 使用 Cloudflare 自身内置的 Workers AI
+// V11 - The Final Correction: 基于 Cloudflare 最新官方文档
 
 export async function onRequest(context) {
-  // 1. 检查 AI 功能是否已在 Cloudflare 中正确绑定
+  // 1. 检查 AI 绑定是否存在
   if (!context.env.AI) {
     return new Response(
-      '错误：AI 功能未在您的 Cloudflare 账户中启用或绑定。请在 Pages 项目的“设置”->“函数”->“Workers AI 绑定”中，将变量名称设置为 AI。',
+      '错误：AI 功能未在 Cloudflare 项目中绑定。请在“设置”->“函数”->“Workers AI 绑定”中，确保变量名称为 AI。',
       { status: 500, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
     );
   }
 
-  // 2. 从 URL 中获取查询参数
+  // 2. 获取 URL 参数
   const { searchParams } = new URL(context.request.url);
   const text = searchParams.get('text');
-  // Cloudflare AI 模型使用 'locale' 参数，例如 'zh-CN', 'en-US'
-  const locale = searchParams.get('locale') || 'zh-CN';
+  // 修正 #1：参数名是 'lang'，不是 'locale'
+  // 修正 #2：语言代码是 'zh'，不是 'zh-CN'
+  const lang = searchParams.get('lang') || 'zh'; 
 
   if (!text) {
     return new Response('错误：必须提供 "text" 查询参数。', {
@@ -23,15 +24,26 @@ export async function onRequest(context) {
     });
   }
 
-  // 3. 直接运行 Cloudflare 平台上的 Facebook MMS 语音合成模型
-  const inputs = { text, locale };
-  const response = await context.env.AI.run('@cf/facebook/mms-tts', inputs);
+  try {
+    // 3. 运行最新的 AI 模型
+    const inputs = { text, lang };
+    // 修正 #3：模型名称是 '@cf/meta/mms-tts-1'
+    const responseStream = await context.env.AI.run('@cf/meta/mms-tts-1', inputs);
 
-  // 4. 成功！将获取到的音频流直接返回给用户 (模型输出为 WAV 格式)
-  return new Response(response, {
-    headers: {
-      'Content-Type': 'audio/wav',
-      'Cache-Control': 'public, max-age=86400', // 缓存一天
-    },
-  });
+    // 4. 返回正确的音频流
+    return new Response(responseStream, {
+      headers: {
+        // 修正 #4：输出格式是 'audio/ogg'
+        'Content-Type': 'audio/ogg', 
+        'Cache-Control': 'public, max-age=86400',
+      },
+    });
+
+  } catch (e) {
+    // 增加详细的错误捕捉，避免再出现 1101 泛用错误
+    return new Response(`AI 模型执行时发生内部错误: ${e.message}`, {
+      status: 500,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
 }
