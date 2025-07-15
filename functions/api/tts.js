@@ -1,5 +1,5 @@
 // 文件路径： functions/api/tts.js
-// V4 - 伪造浏览器身份，获取认证令牌的终极正确版本
+// V5 - The Revelation: 使用 GET 方法获取令牌的终极正确版本
 
 /**
  * Cloudflare Pages Function for Microsoft Text-to-Speech
@@ -7,8 +7,9 @@
  * This function works by first fetching a temporary authentication token, then using that
  * token to call the TTS service.
  *
- * It mimics the official Azure demo page by setting the 'Origin' and 'Referer' headers
- * to bypass the server's security checks, which was the cause of the "400 Bad Request" error.
+ * The key breakthrough was realizing the token endpoint requires a GET request,
+ * not a POST request as previously attempted. This was the root cause of all
+ * "400 Bad Request" errors.
  */
 export async function onRequest(context) {
   // 1. 从 URL 中获取查询参数
@@ -24,16 +25,16 @@ export async function onRequest(context) {
   }
 
   try {
-    // 2. 【终极修正！】第一步：伪装成浏览器，获取临时认证令牌
-    const tokenResponse = await fetch('https://azure.microsoft.com/v8/api/js/token', {
-        method: 'POST',
+    // 2. 【终极修正！】第一步：使用 GET 方法，访问正确的令牌端点！
+    const tokenResponse = await fetch('https://azure.microsoft.com/v8/api/js/token/region/eastus', {
+        method: 'GET', // <-- 正确的方法是 GET，不是 POST！
         headers: {
-            // 【关键！】伪造来源，告诉服务器我们是从官方演示页面来的
-            'Origin': 'https://azure.microsoft.com',
+            // Referer 仍然是一个好的实践，表明我们了解来源
             'Referer': 'https://azure.microsoft.com/en-us/products/cognitive-services/text-to-speech/',
-            'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher-V4-Ultimate'
+            'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher-V5-The-Apology'
         }
     });
+
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       throw new Error(`获取令牌失败: ${tokenResponse.status} ${tokenResponse.statusText}\n服务器响应: ${errorText}`);
@@ -58,7 +59,7 @@ export async function onRequest(context) {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/ssml+xml',
         'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
-        'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher-V4-Ultimate',
+        'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher-V5-The-Apology',
       },
       body: ssml,
     });
