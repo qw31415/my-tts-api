@@ -1,5 +1,5 @@
 // 文件路径： functions/api/tts.js
-// 这是我们自己的、为 Cloudflare Pages 量身定做的 TTS API 核心代码
+// V2 - 修正了微软 API 端点地址的最终正确版本
 
 /**
  * Cloudflare Pages Function for Microsoft Text-to-Speech
@@ -21,7 +21,6 @@ export async function onRequest(context) {
   const text = searchParams.get('text');
   const voice = searchParams.get('voice') || 'zh-CN-XiaoxiaoNeural';
 
-  // 如果缺少 text 参数，则返回错误
   if (!text) {
     return new Response('错误：必须提供 "text" 查询参数。', {
       status: 400,
@@ -29,7 +28,7 @@ export async function onRequest(context) {
     });
   }
 
-  // 2. 构建 SSML (语音合成标记语言)
+  // 2. 构建 SSML
   const ssml = `
     <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
       <voice name="${voice}">
@@ -38,7 +37,6 @@ export async function onRequest(context) {
     </speak>
   `;
 
-  // 用于转义 XML 特殊字符的辅助函数
   function escapeXml(unsafe) {
     return unsafe.replace(/[<>&'"]/g, c => {
       switch (c) {
@@ -51,19 +49,17 @@ export async function onRequest(context) {
     });
   }
 
-  // 3. 请求微软的 TTS API
-  // 这是一个公开的、基础使用无需 API 密钥的终结点
-  const response = await fetch('https://eastus.api.speech.microsoft.com/cognitiveservices/v1', {
+  // 3. 【重大修正！】请求微软的 TTS API，使用正确的 tts.speech 地址
+  const response = await fetch('https://eastus.tts.speech.microsoft.com/cognitiveservices/v1', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/ssml+xml',
       'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
-      'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher',
+      'User-Agent': 'Miko-TTS-Proxy-for-My-Teacher-V2-Final',
     },
     body: ssml,
   });
 
-  // 4. 检查来自微软的响应是否成功
   if (!response.ok) {
     const errorDetails = await response.text();
     console.error(`微软 TTS API 错误: ${response.status} ${response.statusText}`, errorDetails);
@@ -77,7 +73,8 @@ export async function onRequest(context) {
   return new Response(response.body, {
     headers: {
       'Content-Type': 'audio/mpeg',
-      'Cache-Control': 'public, max-age=86400', // 将成功的结果缓存一天
+      'Cache-Control': 'public, max-age=86400',
     },
   });
 }
+
